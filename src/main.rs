@@ -1,30 +1,44 @@
-use std::env;
+mod error;
 
-use minigrep::{run, Config};
+use clap::Parser;
+use error::GrepError;
+use regex::Regex;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
-fn main() {
-    let config = Config::build(env::args()).unwrap_or_else(|err| {
-        eprintln!("Problem parsing arguments: {}", err);
-        std::process::exit(1);
-    });
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(index = 1)]
+    search_string: String,
 
-    println!("Searching for {}", config.query);
-    println!("In file {}", config.file_path);
-
-    if let Err(e) = run(config) {
-        eprintln!("Application error: {}", e);
-
-        std::process::exit(1);
-    }
+    #[arg(index = 2)]
+    search_file: String,
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn a() {
-        let arr = [1, 2, 3, 4, 8];
-        for i in 0..arr.len() {
-            println!("{i}");
-        }
+fn main() -> Result<(), GrepError> {
+    let args: Args = Args::parse();
+    let search_reg = format!("(?im:{})", &args.search_string.to_string());
+    let pattern = Regex::new(&search_reg).unwrap();
+    let files: Vec<_> = glob::glob(&args.search_file)?.collect();
+
+    if files.len() == 0 {
+        return Err(GrepError::FileNotFound);
     }
+
+    files.into_iter().map(|v| v.unwrap()).for_each(|filepath| {
+        let file = File::open(filepath).unwrap();
+        let file_buffer = BufReader::new(file);
+        for line in file_buffer.lines() {
+            if let Ok(line) = line {
+                if let Some(_) = pattern.find(&line) {
+                    println!("{line}");
+                }
+            }
+        }
+    });
+
+    Ok(())
 }
