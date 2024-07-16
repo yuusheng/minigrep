@@ -8,4 +8,7 @@ pub enum GrepError {
 
     #[error("Pattern match error")]
     PatternMatchError(#[from] PatternError),
+
+    #[error("Not found")]
+    PatternNotFound,
 }
